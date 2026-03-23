@@ -1,0 +1,1798 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MPCCU | Operation StockMirage — CTF Training</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;500;600;700&family=Orbitron:wght@700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:       #080b12;
+    --bg2:      #0d1220;
+    --bg3:      #111827;
+    --panel:    #131c2e;
+    --border:   #1e2d47;
+    --amber:    #f59e0b;
+    --amber2:   #fbbf24;
+    --red:      #ef4444;
+    --green:    #22c55e;
+    --blue:     #3b82f6;
+    --cyan:     #06b6d4;
+    --muted:    #64748b;
+    --text:     #cbd5e1;
+    --white:    #f1f5f9;
+    --mono:     'Share Tech Mono', monospace;
+    --ui:       'Rajdhani', sans-serif;
+    --head:     'Orbitron', sans-serif;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--ui);
+    font-size: 15px;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Scanline overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+      to bottom,
+      transparent 0px,
+      transparent 3px,
+      rgba(0,0,0,0.08) 3px,
+      rgba(0,0,0,0.08) 4px
+    );
+    pointer-events: none;
+    z-index: 9999;
+  }
+
+  /* ───── TOP BAR ───── */
+  .topbar {
+    background: linear-gradient(90deg, #06122a 0%, #0d1f3c 60%, #08162e 100%);
+    border-bottom: 2px solid var(--amber);
+    padding: 10px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: 0 4px 30px rgba(245,158,11,0.15);
+  }
+  .topbar-left { display: flex; align-items: center; gap: 16px; }
+  .emblem {
+    width: 52px; height: 52px;
+    background: radial-gradient(circle, #1a3a6e, #061020);
+    border: 2px solid var(--amber);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px;
+    box-shadow: 0 0 16px rgba(245,158,11,0.4);
+    flex-shrink: 0;
+  }
+  .topbar-title h1 {
+    font-family: var(--head);
+    font-size: 13px;
+    color: var(--amber);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+  .topbar-title p {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 1px;
+  }
+  .topbar-right { text-align: right; }
+  .case-badge {
+    font-family: var(--head);
+    font-size: 11px;
+    color: var(--amber2);
+    letter-spacing: 3px;
+    background: rgba(245,158,11,0.1);
+    border: 1px solid rgba(245,158,11,0.3);
+    padding: 4px 12px;
+    border-radius: 2px;
+  }
+  .live-dot {
+    display: inline-block; width: 8px; height: 8px;
+    background: var(--red); border-radius: 50%;
+    animation: blink 1.2s infinite;
+    margin-right: 6px;
+  }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.2} }
+
+  /* ───── ALERT BANNER ───── */
+  .alert-banner {
+    background: rgba(239,68,68,0.12);
+    border-bottom: 1px solid rgba(239,68,68,0.3);
+    font-family: var(--mono);
+    font-size: 11px;
+    color: #fca5a5;
+    padding: 6px 24px;
+    letter-spacing: 1px;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+  .alert-banner span { display: inline-block; animation: ticker 28s linear infinite; }
+  @keyframes ticker { from{transform:translateX(100vw)} to{transform:translateX(-100%)} }
+
+  /* ───── LAYOUT ───── */
+  .main { display: flex; min-height: calc(100vh - 78px); }
+  .sidebar {
+    width: 220px; flex-shrink: 0;
+    background: var(--bg2);
+    border-right: 1px solid var(--border);
+    padding: 20px 0;
+  }
+  .sidebar-section { margin-bottom: 24px; }
+  .sidebar-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 2px;
+    padding: 0 16px 8px;
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 8px;
+  }
+  .nav-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 16px;
+    cursor: pointer;
+    font-family: var(--ui);
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--muted);
+    letter-spacing: 0.5px;
+    transition: all 0.2s;
+    border-left: 3px solid transparent;
+    user-select: none;
+  }
+  .nav-item:hover { background: rgba(245,158,11,0.05); color: var(--text); }
+  .nav-item.active { color: var(--amber); border-left-color: var(--amber); background: rgba(245,158,11,0.08); }
+  .nav-item .icon { font-size: 16px; width: 20px; text-align: center; }
+
+  .status-chip {
+    font-family: var(--mono);
+    font-size: 9px;
+    padding: 2px 6px;
+    border-radius: 2px;
+    letter-spacing: 1px;
+    margin-left: auto;
+  }
+  .chip-red { background: rgba(239,68,68,0.15); color: #fca5a5; border: 1px solid rgba(239,68,68,0.3); }
+  .chip-green { background: rgba(34,197,94,0.15); color: #86efac; border: 1px solid rgba(34,197,94,0.3); }
+  .chip-amber { background: rgba(245,158,11,0.15); color: var(--amber2); border: 1px solid rgba(245,158,11,0.3); }
+
+  .case-stats { padding: 0 16px; }
+  .stat-row { display: flex; justify-content: space-between; align-items: center; padding: 7px 0; border-bottom: 1px solid var(--border); }
+  .stat-row:last-child { border-bottom: none; }
+  .stat-label { font-size: 11px; color: var(--muted); font-family: var(--mono); }
+  .stat-val { font-size: 12px; color: var(--text); font-weight: 700; font-family: var(--mono); }
+  .stat-val.danger { color: var(--red); }
+  .stat-val.warn { color: var(--amber); }
+  .stat-val.ok { color: var(--green); }
+
+  /* ───── CONTENT AREA ───── */
+  .content {
+    flex: 1;
+    padding: 28px;
+    overflow-y: auto;
+  }
+
+  .tab-pane { display: none; }
+  .tab-pane.active { display: block; animation: fadein 0.3s ease; }
+  @keyframes fadein { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+
+  /* ───── SECTION HEADERS ───── */
+  .section-header {
+    display: flex; align-items: baseline; gap: 14px;
+    margin-bottom: 24px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .section-header h2 {
+    font-family: var(--head);
+    font-size: 18px;
+    color: var(--white);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+  .section-header .sub {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 1px;
+  }
+
+  /* ───── CARDS ───── */
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+  .card-header {
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: 14px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+  }
+  .card-title {
+    font-family: var(--ui);
+    font-weight: 700;
+    font-size: 14px;
+    color: var(--white);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    flex: 1;
+  }
+  .card-icon { font-size: 18px; }
+
+  /* ───── BRIEF TAB ───── */
+  .incident-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+  @media(max-width:800px){ .incident-grid{grid-template-columns:1fr;} }
+
+  .info-block { margin-bottom: 10px; }
+  .info-label { font-family: var(--mono); font-size: 10px; color: var(--muted); letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 4px; }
+  .info-val { font-family: var(--ui); font-size: 15px; color: var(--white); font-weight: 600; }
+  .info-val.money { color: var(--red); font-size: 20px; font-family: var(--mono); }
+
+  .story-text {
+    font-size: 14px;
+    line-height: 1.8;
+    color: var(--text);
+    font-family: var(--ui);
+  }
+  .story-text strong { color: var(--amber2); }
+  .story-text .highlight { background: rgba(245,158,11,0.1); border-left: 3px solid var(--amber); padding: 10px 14px; margin: 12px 0; border-radius: 0 4px 4px 0; }
+
+  /* ───── TIMELINE ───── */
+  .timeline { position: relative; padding-left: 30px; }
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 10px; top: 0; bottom: 0;
+    width: 2px;
+    background: linear-gradient(to bottom, var(--amber), var(--border) 80%);
+  }
+  .tl-item {
+    position: relative;
+    margin-bottom: 20px;
+    opacity: 0;
+    animation: tl-appear 0.4s ease forwards;
+  }
+  .tl-item:nth-child(1){animation-delay:0.1s}
+  .tl-item:nth-child(2){animation-delay:0.2s}
+  .tl-item:nth-child(3){animation-delay:0.3s}
+  .tl-item:nth-child(4){animation-delay:0.4s}
+  .tl-item:nth-child(5){animation-delay:0.5s}
+  .tl-item:nth-child(6){animation-delay:0.6s}
+  .tl-item:nth-child(7){animation-delay:0.7s}
+  .tl-item:nth-child(8){animation-delay:0.8s}
+  .tl-item:nth-child(9){animation-delay:0.9s}
+  .tl-item:nth-child(10){animation-delay:1.0s}
+  @keyframes tl-appear { from{opacity:0;transform:translateX(-10px)} to{opacity:1;transform:translateX(0)} }
+
+  .tl-dot {
+    position: absolute;
+    left: -24px; top: 12px;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: var(--bg);
+    border: 2px solid var(--amber);
+    box-shadow: 0 0 8px rgba(245,158,11,0.5);
+  }
+  .tl-dot.critical { border-color: var(--red); box-shadow: 0 0 8px rgba(239,68,68,0.5); }
+  .tl-dot.safe { border-color: var(--green); box-shadow: 0 0 8px rgba(34,197,94,0.5); }
+  
+  .tl-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 14px 16px;
+  }
+  .tl-card.critical-event { border-left: 3px solid var(--red); }
+  .tl-card.warning-event { border-left: 3px solid var(--amber); }
+  .tl-card.normal-event { border-left: 3px solid var(--blue); }
+
+  .tl-date { font-family: var(--mono); font-size: 10px; color: var(--amber); letter-spacing: 1px; margin-bottom: 4px; }
+  .tl-title { font-size: 14px; font-weight: 700; color: var(--white); margin-bottom: 4px; }
+  .tl-desc { font-size: 12px; color: var(--muted); line-height: 1.6; }
+  .tl-amount { font-family: var(--mono); font-size: 13px; color: var(--red); margin-top: 4px; font-weight: 700; }
+
+  /* ───── EVIDENCE LOCKER ───── */
+  .evidence-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+  .evidence-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .evidence-card:hover { border-color: var(--cyan); box-shadow: 0 4px 20px rgba(6,182,212,0.15); }
+  .evidence-card-top {
+    padding: 14px 16px;
+    display: flex; align-items: center; gap: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .ev-icon {
+    width: 40px; height: 40px;
+    border-radius: 4px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px;
+    flex-shrink: 0;
+  }
+  .ev-icon.green { background: rgba(34,197,94,0.1); }
+  .ev-icon.blue { background: rgba(59,130,246,0.1); }
+  .ev-icon.amber { background: rgba(245,158,11,0.1); }
+  .ev-icon.red { background: rgba(239,68,68,0.1); }
+  .ev-icon.cyan { background: rgba(6,182,212,0.1); }
+
+  .ev-info { flex: 1; }
+  .ev-title { font-size: 13px; font-weight: 700; color: var(--white); margin-bottom: 2px; }
+  .ev-sub { font-family: var(--mono); font-size: 10px; color: var(--muted); letter-spacing: 0.5px; }
+  .ev-badge { font-family: var(--mono); font-size: 9px; padding: 2px 8px; border-radius: 2px; }
+  .evidence-body { padding: 14px 16px; font-family: var(--mono); font-size: 11px; color: var(--muted); line-height: 1.6; }
+  .evidence-body .click-hint { color: var(--cyan); font-size: 10px; margin-top: 8px; }
+
+  /* MODAL */
+  .modal-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.85);
+    z-index: 200;
+    align-items: center; justify-content: center;
+    padding: 20px;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-top: 2px solid var(--cyan);
+    border-radius: 6px;
+    width: 100%; max-width: 780px;
+    max-height: 85vh;
+    overflow-y: auto;
+    animation: modal-in 0.25s ease;
+  }
+  @keyframes modal-in { from{opacity:0;transform:scale(0.95)} to{opacity:1;transform:scale(1)} }
+  .modal-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 12px;
+    position: sticky; top: 0; background: var(--bg2); z-index: 1;
+  }
+  .modal-title { font-family: var(--head); font-size: 13px; color: var(--cyan); letter-spacing: 2px; flex: 1; }
+  .modal-close {
+    cursor: pointer;
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; color: var(--muted);
+    transition: all 0.2s;
+  }
+  .modal-close:hover { border-color: var(--red); color: var(--red); }
+  .modal-body { padding: 20px; }
+
+  /* Fake chat */
+  .chat-window {
+    background: #0a1a0a;
+    border: 1px solid #1a3a1a;
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .chat-topbar {
+    background: #128c7e;
+    padding: 10px 14px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .chat-avatar {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: #25d366;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px; font-weight: 700; color: white;
+    flex-shrink: 0;
+  }
+  .chat-contact { color: white; }
+  .chat-contact-name { font-weight: 700; font-size: 14px; }
+  .chat-contact-status { font-size: 11px; opacity: 0.8; }
+  .chat-messages { padding: 12px; display: flex; flex-direction: column; gap: 8px; background: #0d1f0d url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23128c7e' fill-opacity='0.04'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E"); }
+  .msg { max-width: 75%; padding: 8px 10px; border-radius: 8px; font-family: var(--mono); font-size: 12px; line-height: 1.5; position: relative; }
+  .msg-in { background: #1e3a1e; color: #d4f1d4; align-self: flex-start; border-bottom-left-radius: 2px; }
+  .msg-out { background: #003d00; color: #a8e6a3; align-self: flex-end; border-bottom-right-radius: 2px; }
+  .msg-time { font-size: 9px; opacity: 0.6; text-align: right; margin-top: 3px; }
+  .msg-link { color: #64d8ff; text-decoration: underline; word-break: break-all; }
+  .clue-flag { display: inline-block; background: rgba(245,158,11,0.15); border: 1px dashed var(--amber); border-radius: 3px; padding: 2px 8px; margin-top: 4px; font-size: 10px; color: var(--amber); }
+
+  /* WHOIS block */
+  .whois-block {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 16px;
+    font-family: var(--mono);
+    font-size: 12px;
+    line-height: 2;
+    color: var(--text);
+  }
+  .whois-key { color: var(--cyan); }
+  .whois-val { color: var(--white); }
+  .whois-highlight { color: var(--amber); font-weight: bold; }
+
+  /* Transaction table */
+  .tx-table { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 12px; }
+  .tx-table th { background: rgba(245,158,11,0.1); color: var(--amber); font-size: 10px; letter-spacing: 1px; text-transform: uppercase; padding: 8px 10px; text-align: left; border: 1px solid var(--border); }
+  .tx-table td { padding: 8px 10px; border: 1px solid var(--border); color: var(--text); vertical-align: top; }
+  .tx-table tr:hover td { background: rgba(255,255,255,0.02); }
+  .tx-debit { color: var(--red); font-weight: 700; }
+  .tx-mule { color: var(--amber); }
+  .tx-suspect { background: rgba(239,68,68,0.08) !important; }
+
+  /* APK permissions */
+  .perm-list { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+  .perm-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 12px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    font-family: var(--mono);
+    font-size: 11px;
+  }
+  .perm-item.danger { border-color: rgba(239,68,68,0.4); background: rgba(239,68,68,0.05); }
+  .perm-item.danger .perm-name { color: var(--red); }
+  .perm-item.warn { border-color: rgba(245,158,11,0.4); }
+  .perm-item.warn .perm-name { color: var(--amber); }
+  .perm-item.normal .perm-name { color: var(--muted); }
+  .perm-icon { font-size: 14px; }
+  .perm-desc { font-size: 10px; color: var(--muted); margin-left: auto; text-align: right; }
+
+  /* EXIF data */
+  .exif-table { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 11px; }
+  .exif-table tr { border-bottom: 1px solid var(--border); }
+  .exif-table td { padding: 7px 10px; }
+  .exif-key { color: var(--cyan); width: 40%; }
+  .exif-val { color: var(--text); }
+  .exif-val.sus { color: var(--amber); font-weight: bold; }
+
+  /* ───── CHALLENGES ───── */
+  .challenge-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    margin-bottom: 16px;
+    overflow: hidden;
+    transition: border-color 0.2s;
+  }
+  .challenge-card.solved { border-color: var(--green); }
+  .challenge-card.solved .ch-header { border-bottom-color: rgba(34,197,94,0.3); }
+
+  .ch-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 14px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .ch-num {
+    width: 36px; height: 36px;
+    border: 2px solid;
+    border-radius: 4px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--head);
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+  .diff-easy { border-color: var(--green); color: var(--green); }
+  .diff-medium { border-color: var(--amber); color: var(--amber); }
+  .diff-hard { border-color: var(--red); color: var(--red); }
+
+  .ch-info { flex: 1; }
+  .ch-title { font-size: 15px; font-weight: 700; color: var(--white); margin-bottom: 2px; }
+  .ch-meta { font-family: var(--mono); font-size: 10px; color: var(--muted); letter-spacing: 1px; }
+  .ch-points {
+    font-family: var(--head);
+    font-size: 16px;
+    font-weight: 900;
+    color: var(--amber);
+  }
+  .ch-status { font-size: 20px; }
+
+  .ch-body { padding: 20px; display: none; }
+  .ch-body.open { display: block; }
+
+  .challenge-desc {
+    font-size: 13px;
+    line-height: 1.8;
+    color: var(--text);
+    margin-bottom: 16px;
+    padding: 12px;
+    background: rgba(255,255,255,0.02);
+    border-radius: 4px;
+    border-left: 3px solid var(--blue);
+  }
+  .evidence-refs {
+    margin-bottom: 16px;
+    font-family: var(--mono);
+    font-size: 11px;
+  }
+  .evidence-refs .ref-label { color: var(--muted); margin-bottom: 6px; letter-spacing: 1px; }
+  .ev-ref-tag {
+    display: inline-block;
+    background: rgba(6,182,212,0.1);
+    border: 1px solid rgba(6,182,212,0.3);
+    color: var(--cyan);
+    padding: 3px 10px;
+    border-radius: 3px;
+    margin: 3px 4px 3px 0;
+    font-size: 11px;
+    cursor: pointer;
+  }
+  .ev-ref-tag:hover { background: rgba(6,182,212,0.2); }
+
+  .flag-input-area {
+    display: flex; gap: 10px; align-items: center;
+    margin-top: 14px;
+  }
+  .flag-label { font-family: var(--mono); font-size: 11px; color: var(--muted); letter-spacing: 1px; white-space: nowrap; }
+  .flag-input {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 9px 14px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--white);
+    letter-spacing: 1px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .flag-input:focus { border-color: var(--cyan); }
+  .flag-input.correct { border-color: var(--green); background: rgba(34,197,94,0.05); }
+  .flag-input.wrong { border-color: var(--red); background: rgba(239,68,68,0.05); animation: shake 0.3s; }
+  @keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-4px)} 75%{transform:translateX(4px)} }
+
+  .submit-btn {
+    background: rgba(245,158,11,0.15);
+    border: 1px solid var(--amber);
+    color: var(--amber);
+    padding: 9px 18px;
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 1px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+  .submit-btn:hover { background: rgba(245,158,11,0.25); }
+  .hint-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    padding: 9px 14px;
+    font-family: var(--mono);
+    font-size: 11px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .hint-btn:hover { border-color: var(--blue); color: var(--blue); }
+  .flag-result { margin-top: 10px; font-family: var(--mono); font-size: 12px; display: none; }
+  .flag-result.show { display: block; }
+  .flag-result.success { color: var(--green); }
+  .flag-result.fail { color: var(--red); }
+  .hint-box {
+    margin-top: 10px;
+    padding: 10px 14px;
+    background: rgba(59,130,246,0.08);
+    border: 1px solid rgba(59,130,246,0.25);
+    border-radius: 4px;
+    font-size: 12px;
+    color: #93c5fd;
+    display: none;
+  }
+  .hint-box.show { display: block; }
+
+  /* ───── SCOREBOARD ───── */
+  .score-overview {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  .score-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 20px;
+    text-align: center;
+  }
+  .score-card .big-num {
+    font-family: var(--head);
+    font-size: 36px;
+    font-weight: 900;
+    display: block;
+    margin-bottom: 4px;
+  }
+  .score-card .label { font-family: var(--mono); font-size: 10px; color: var(--muted); letter-spacing: 2px; }
+  .progress-bar-wrap { background: var(--bg); border-radius: 4px; height: 8px; overflow: hidden; margin-top: 8px; }
+  .progress-bar-fill { height: 100%; background: linear-gradient(90deg, var(--amber), var(--amber2)); border-radius: 4px; transition: width 0.5s ease; }
+
+  /* ───── TRAINER NOTES ───── */
+  .trainer-card {
+    background: rgba(59,130,246,0.06);
+    border: 1px solid rgba(59,130,246,0.2);
+    border-left: 4px solid var(--blue);
+    border-radius: 4px;
+    padding: 16px 18px;
+    margin-bottom: 14px;
+  }
+  .trainer-card .t-header {
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 10px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: #93c5fd;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+  .trainer-card p { font-size: 13px; line-height: 1.7; color: var(--text); }
+  .trainer-card ul { margin-left: 18px; margin-top: 8px; }
+  .trainer-card li { font-size: 13px; line-height: 1.7; color: var(--text); margin-bottom: 4px; }
+
+  .answer-key {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+    margin-top: 16px;
+  }
+  .ak-header {
+    background: rgba(239,68,68,0.1);
+    border-bottom: 1px solid rgba(239,68,68,0.3);
+    padding: 12px 16px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .ak-title { font-family: var(--head); font-size: 12px; color: var(--red); letter-spacing: 2px; }
+  .lock-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    padding: 5px 14px;
+    font-family: var(--mono);
+    font-size: 11px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .lock-btn:hover { border-color: var(--red); color: var(--red); }
+  .ak-body { padding: 16px; display: none; }
+  .ak-body.open { display: block; }
+  .ak-row {
+    display: flex; align-items: flex-start; gap: 14px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .ak-row:last-child { border-bottom: none; }
+  .ak-ch-num { font-family: var(--head); font-size: 12px; color: var(--amber); width: 28px; flex-shrink: 0; }
+  .ak-ch-name { font-size: 12px; color: var(--text); flex: 1; }
+  .ak-flag { font-family: var(--mono); font-size: 12px; color: var(--green); }
+
+  /* Footer */
+  .content-footer {
+    margin-top: 40px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 1px;
+    text-align: center;
+  }
+
+  /* Responsive */
+  @media(max-width: 700px) {
+    .sidebar { display: none; }
+    .content { padding: 16px; }
+    .score-overview { grid-template-columns: 1fr; }
+  }
+
+  /* Glitch on title */
+  .glitch {
+    position: relative;
+    animation: glitch-anim 4s infinite;
+  }
+  @keyframes glitch-anim {
+    0%,90%,100% { text-shadow: none; }
+    92% { text-shadow: 2px 0 var(--red); }
+    94% { text-shadow: -2px 0 var(--cyan); }
+    96% { text-shadow: 2px 0 var(--red); }
+    98% { text-shadow: none; }
+  }
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="topbar-left">
+    <div class="emblem">🛡️</div>
+    <div class="topbar-title">
+      <h1>Mumbai Police — Cyber Crime Cell</h1>
+      <p>TRAINING EXERCISE // RESTRICTED ACCESS // FY 2025-26</p>
+    </div>
+  </div>
+  <div class="topbar-right">
+    <div class="case-badge"><span class="live-dot"></span>CASE: CR/CY/0412/2025 // OPERATION STOCKMIRAGE</div>
+  </div>
+</div>
+
+<!-- TICKER -->
+<div class="alert-banner">
+  <span>⚠ TRAINING SIMULATION — ALL EVIDENCE IS SYNTHETIC — DO NOT SHARE OUTSIDE THIS SESSION &nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp; MPCCU TRAINING DIV. B3 &nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp; CRIME TYPE: INVESTMENT FRAUD / ONLINE CHEATING / IPC 420 / IT ACT 66C &nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp; VICTIM LOSS: ₹8,40,000 &nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp; 6 FLAGS TO CAPTURE — GOOD LUCK, OFFICERS &nbsp;&nbsp;&nbsp;|</span>
+</div>
+
+<!-- MAIN LAYOUT -->
+<div class="main">
+  <!-- SIDEBAR -->
+  <nav class="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-label">Navigation</div>
+      <div class="nav-item active" onclick="showTab('brief', this)"><span class="icon">📋</span> Case Brief</div>
+      <div class="nav-item" onclick="showTab('timeline', this)"><span class="icon">⏱</span> Timeline</div>
+      <div class="nav-item" onclick="showTab('evidence', this)"><span class="icon">🔍</span> Evidence Locker</div>
+      <div class="nav-item" onclick="showTab('challenges', this)"><span class="icon">🚩</span> CTF Challenges <span class="status-chip chip-amber" id="flag-counter">0/6</span></div>
+      <div class="nav-item" onclick="showTab('trainer', this)"><span class="icon">🎓</span> Trainer Guide</div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-label">Case Stats</div>
+      <div class="case-stats">
+        <div class="stat-row"><span class="stat-label">Victim</span><span class="stat-val">Ramesh K.</span></div>
+        <div class="stat-row"><span class="stat-label">Loss</span><span class="stat-val danger">₹8,40,000</span></div>
+        <div class="stat-row"><span class="stat-label">Crime Type</span><span class="stat-val warn">Pig Butchering</span></div>
+        <div class="stat-row"><span class="stat-label">Mule Accts</span><span class="stat-val danger">4 Found</span></div>
+        <div class="stat-row"><span class="stat-label">Origin Est.</span><span class="stat-val warn">SE Asia</span></div>
+        <div class="stat-row"><span class="stat-label">Your Score</span><span class="stat-val ok" id="sidebar-score">0 / 600</span></div>
+      </div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-label">Difficulty</div>
+      <div class="case-stats">
+        <div class="stat-row"><span class="stat-label">Easy (×2)</span><span class="stat-val ok">100 pts</span></div>
+        <div class="stat-row"><span class="stat-label">Medium (×2)</span><span class="stat-val warn">150 pts</span></div>
+        <div class="stat-row"><span class="stat-label">Hard (×2)</span><span class="stat-val danger">175 pts</span></div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- CONTENT AREA -->
+  <div class="content">
+
+    <!-- ═══════════════════ TAB: BRIEF ═══════════════════ -->
+    <div id="tab-brief" class="tab-pane active">
+      <div class="section-header">
+        <h2 class="glitch">Operation StockMirage</h2>
+        <span class="sub">// CASE BRIEF & BACKGROUND</span>
+      </div>
+
+      <div class="incident-grid">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-icon">👤</span>
+            <span class="card-title">Victim Profile</span>
+            <span class="status-chip chip-red">COMPLAINANT</span>
+          </div>
+          <div class="info-block"><div class="info-label">Name</div><div class="info-val">Ramesh Dattatray Kulkarni</div></div>
+          <div class="info-block"><div class="info-label">Age / Occupation</div><div class="info-val">47 Years — Chartered Accountant</div></div>
+          <div class="info-block"><div class="info-label">Address</div><div class="info-val">Flat 704, Sai Darshan CHS, Andheri West, Mumbai – 400053</div></div>
+          <div class="info-block"><div class="info-label">Contact</div><div class="info-val">+91-98207-XXXXX</div></div>
+          <div class="info-block"><div class="info-label">FIR No.</div><div class="info-val">CR/CY/0412/2025 — Cyber Cell, Andheri</div></div>
+          <div class="info-block"><div class="info-label">Date of Complaint</div><div class="info-val">21 March 2025</div></div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <span class="card-icon">💸</span>
+            <span class="card-title">Financial Loss Summary</span>
+            <span class="status-chip chip-red">CRITICAL</span>
+          </div>
+          <div class="info-block"><div class="info-label">Total Amount Defrauded</div><div class="info-val money">₹ 8,40,000</div></div>
+          <div class="info-block"><div class="info-label">Period</div><div class="info-val">01 Mar 2025 — 20 Mar 2025 (20 days)</div></div>
+          <div class="info-block"><div class="info-label">Payment Mode</div><div class="info-val">UPI (4 transactions across 4 mule accounts)</div></div>
+          <div class="info-block"><div class="info-label">Fake Platform</div><div class="info-val">TradePro India (tradepro-india.net)</div></div>
+          <div class="info-block"><div class="info-label">Suspect Contact</div><div class="info-val">"Priya Sharma" — WA: +91-80762-14398</div></div>
+          <div class="info-block"><div class="info-label">IPC Sections</div><div class="info-val">420, 406 IPC + 66C/66D IT Act</div></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <span class="card-icon">📖</span>
+          <span class="card-title">How The Crime Happened — Full Narrative</span>
+        </div>
+        <div class="story-text">
+          <p><strong>1 March 2025 — The Hook</strong></p>
+          <p>Ramesh Kulkarni, a 47-year-old Chartered Accountant from Andheri West, receives a WhatsApp group invite link from an unknown number. The group is named <strong>"Mumbai Elite Traders 🚀 | SEBI Tips"</strong>. The group already has 248 members (all fake/bot accounts). A "stock expert" called <strong>Dr. Arvind Kapoor</strong> posts daily "free tips" with screenshots of huge gains. Ramesh, curious about stock markets, stays in the group.</p>
+          
+          <div class="highlight">🔑 <strong>Social Engineering Tactic:</strong> The group creates a false sense of legitimacy using SEBI branding, multiple fake member profiles, and testimonials with fabricated profit screenshots.</div>
+
+          <p style="margin-top:14px"><strong>2 March 2025 — The Romance/Trust Building</strong></p>
+          <p>A profile named <strong>"Priya Sharma"</strong> (+91-80762-14398) with an attractive display picture messages Ramesh privately. She says she is a financial analyst at a Mumbai firm, also part of the group. Over 3 days she builds rapport — discussing family, work, markets. She shares she made ₹2.3 lakhs using a "premium trading platform" called <strong>TradePro India</strong>, which is exclusively invite-only.</p>
+
+          <div class="highlight">🔑 <strong>Technique — Pig Butchering:</strong> Like fattening a pig before slaughter, scammers invest time building deep trust before asking for money.</div>
+
+          <p style="margin-top:14px"><strong>5 March 2025 — The Bait (App Download)</strong></p>
+          <p>Priya sends Ramesh a link to download the <strong>TradePro India APK</strong> directly (not from Play Store — red flag). She helps him register, and a fake "Relationship Manager" named Vikram Joshi calls him from an Indian VoIP number. Ramesh is onboarded. The app looks professional — it shows live stock prices (scraped from NSE), a portfolio dashboard, and an exciting UI. Priya shows him her own "portfolio" of ₹4.8 lakhs in profit.</p>
+
+          <p style="margin-top:14px"><strong>8 March 2025 — First Small Win</strong></p>
+          <p>Ramesh is guided to make his first investment of just <strong>₹5,000</strong> (via UPI). Within 2 days, the app shows a profit of <strong>₹8,400</strong> — a 68% gain. He withdraws successfully (scammers allow first withdrawal to build confidence). Ramesh is hooked.</p>
+
+          <div class="highlight">⚠️ <strong>Classic Trick:</strong> Scammers always allow the first small withdrawal. This "proof of concept" eliminates all doubt and hooks the victim completely.</div>
+
+          <p style="margin-top:14px"><strong>10–13 March 2025 — Escalating Investments</strong></p>
+          <p>Emboldened, Ramesh invests <strong>₹75,000</strong> on March 10. The app shows ₹1,42,000 within 3 days. Priya urges him to invest more before a "special IPO window" closes. On March 13, Ramesh transfers <strong>₹3,00,000</strong> from his savings. The app now shows his portfolio at <strong>₹5,28,000</strong>.</p>
+
+          <p style="margin-top:14px"><strong>15 March 2025 — The Squeeze Begins (Fake Taxes/Fees)</strong></p>
+          <p>Ramesh tries to withdraw his profits. The app shows an error: <em>"Your account is flagged. You must pay 18% GST on profits before withdrawal as per SEBI mandate."</em> Priya "helps" him — saying it happened to her too and she paid up, then received everything. Ramesh transfers <strong>₹2,00,000</strong> to a "GST collection account" (another mule).</p>
+
+          <p style="margin-top:14px"><strong>17 March 2025 — RBI Audit Scam</strong></p>
+          <p>Still unable to withdraw, Ramesh is told his account is under "RBI Audit" due to large transactions. A fake "RBI representative" (scammer) calls from a spoofed number, speaks official Hindi, and says he needs to pay a ₹1,65,000 "audit clearance fee" which will be refunded within 4 hours. Ramesh, desperate to recover his money, pays. <strong>Total loss now: ₹8,40,000.</strong></p>
+
+          <p style="margin-top:14px"><strong>20 March 2025 — Vanishing Act</strong></p>
+          <p>All WhatsApp contacts go dark. The TradePro India app shows "Server Maintenance." The website goes offline. Ramesh calls his bank — money is gone from all 4 mule accounts, transferred further. He files a complaint at Andheri Cyber Cell on 21 March 2025.</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><span class="card-icon">🎯</span><span class="card-title">Your Mission as Investigators</span></div>
+        <div class="story-text">
+          Six pieces of critical digital evidence have been collected. Your job is to analyze each piece, find hidden clues, and capture 6 flags in the format <code style="background:rgba(245,158,11,0.15);padding:2px 8px;border-radius:3px;font-family:var(--mono);color:var(--amber)">MPCCU{...}</code> to prove you can trace, identify, and build a case against the perpetrators.
+          <br><br>
+          Navigate to <strong>Evidence Locker</strong> to examine all artifacts, then head to <strong>CTF Challenges</strong> to submit your flags.
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════ TAB: TIMELINE ═══════════════════ -->
+    <div id="tab-timeline" class="tab-pane">
+      <div class="section-header">
+        <h2>Crime Timeline</h2>
+        <span class="sub">// CHRONOLOGICAL EVENT RECONSTRUCTION</span>
+      </div>
+
+      <div class="timeline">
+        <div class="tl-item">
+          <div class="tl-dot safe"></div>
+          <div class="tl-card normal-event">
+            <div class="tl-date">📅 01 MARCH 2025 — 11:32 AM</div>
+            <div class="tl-title">WhatsApp Group Invite Received</div>
+            <div class="tl-desc">Victim receives invite link to "Mumbai Elite Traders 🚀 | SEBI Tips" group from unknown number +91-80762-14398. 248 members visible (all bots). Group admin: Dr_Arvind_K. <br><em>Clue: Group was created just 2 days before victim was added.</em></div>
+          </div>
+        </div>
+
+        <div class="tl-item">
+          <div class="tl-dot"></div>
+          <div class="tl-card normal-event">
+            <div class="tl-date">📅 02 MARCH 2025 — 03:17 PM</div>
+            <div class="tl-title">First Private Contact by "Priya Sharma"</div>
+            <div class="tl-desc">Suspect "Priya Sharma" (+91-80762-14398) initiates private chat. Claims to be a financial analyst in BKC. Profile picture: Stock photo. Online at odd hours — timestamps show activity between 11 PM–3 AM IST (potential time zone offset).</div>
+          </div>
+        </div>
+
+        <div class="tl-item">
+          <div class="tl-dot"></div>
+          <div class="tl-card warning-event">
+            <div class="tl-date">📅 05 MARCH 2025 — 10:08 AM</div>
+            <div class="tl-title">Malicious APK Link Shared</div>
+            <div class="tl-desc">Priya sends APK download link: <code>http://103.27.8.142/downloads/tradepro_v2.1.apk</code>. NOT from Google Play Store. App requests 14 permissions including READ_SMS and RECEIVE_SMS. Victim downloads and installs.</div>
+          </div>
+        </div>
+
+        <div class="tl-item">
+          <div class="tl-dot"></div>
+          <div class="tl-card normal-event">
+            <div class="tl-date">📅 08 MARCH 2025 — 02:45 PM</div>
+            <div class="tl-title">First Small Investment + Withdrawal (Trust Building)</div>
+            <div class="tl-desc">₹5,000 invested. App shows ₹8,400 in 2 days. Victim successfully withdraws ₹8,400 to build confidence. This is a planned tactic — scammers absorb this loss to secure a larger payday.</div>
+            <div class="tl-amount">+ ₹5,000 IN (allowed withdrawal: ₹8,400 refunded)</div>
+          </div>
+        </div>
+
+        <div class="tl-item">
+          <div class="tl-dot critical"></div>
+          <div class="tl-card critical-event">
+            <div class="tl-date">📅 10 MARCH 2025 — 09:12 AM</div>
+            <div class="tl-title">TRANSACTION 1 — First Large Transfer</div>
+            <div class="tl-desc">UPI Payment to varun.trading@paytm (Varun Mehta, mule account, Surat). Bank: Paytm Payments Bank. Account opened 12 days earlier.</div>
+            <div class="tl-amount">- ₹75,000 | UTR: PYTM25031000000412</div>
+          </div>
+        </div>
+
+        <div class="tl-item">
+          <div class="tl-dot critical"></div>
+          <div class="tl-card critical-event">
+            <div class="tl-date">📅 13 MARCH 2025 — 11:34 AM</div>
+            <div class="tl-title">TRANSACTION 2 — Largest Transfer</div>
+            <div class="tl-desc">UPI Payment to profits.india2024@ybl (Yes Bank mule account). Account KYC: Fake Aadhaar. Immediately forwarded to overseas account via hawala network within 6 hours.</div>
+            <div class="tl-amount">- ₹3,00,000 | UTR: YESB25031300002891</div>
+          </div>
+        </div>
+
+        <div class="tl-item">
+          <div class="tl-dot critical"></div>
+          <div class="tl-card critical-event">
+            <div class="tl-date">📅 15 MARCH 2025 — 04:20 PM</div>
+            <div class="tl-title">TRANSACTION 3 — Fake "GST Payment"</div>
+            <div class="tl-desc">Victim told to pay 18% GST on "profits" before withdrawal. UPI to gst.collect.india@okaxis (Axis Bank shell company account, GST number: FAKE). Victim believes this is legitimate SEBI mandate.</div>
+            <div class="tl-amount">- ₹2,00,000 | UTR: AXSB25031500008821</div>
+          </div>
+        </div>
+
+        <div class="tl-item">
+          <div class="tl-dot critical"></div>
+          <div class="tl-card critical-event">
+            <div class="tl-date">📅 17 MARCH 2025 — 02:07 PM</div>
+            <div class="tl-title">TRANSACTION 4 — Fake "RBI Audit Fee"</div>
+            <div class="tl-desc">Caller claims to be from RBI, speaks from spoofed +91-22-26100XXX number. Victim pays final amount. UPI to rbi.clearance88@okhdfc (HDFC mule). Account holder: shell entity. Money forwarded within 2 hours.</div>
+            <div class="tl-amount">- ₹1,65,000 | UTR: HDFC25031700014423</div>
+          </div>
+        </div>
+
+        <div class="tl-item">
+          <div class="tl-dot"></div>
+          <div class="tl-card warning-event">
+            <div class="tl-date">📅 20 MARCH 2025 — UNKNOWN TIME</div>
+            <div class="tl-title">Complete Vanishing — All Contacts Go Dark</div>
+            <div class="tl-desc">WhatsApp numbers stop responding. TradePro India app shows "Server Error 503." Website tradepro-india.net goes offline. WhatsApp group deleted. "Priya Sharma" profile deleted.</div>
+          </div>
+        </div>
+
+        <div class="tl-item">
+          <div class="tl-dot safe"></div>
+          <div class="tl-card normal-event">
+            <div class="tl-date">📅 21 MARCH 2025 — 10:30 AM</div>
+            <div class="tl-title">FIR Filed — Andheri Cyber Cell</div>
+            <div class="tl-desc">Victim files complaint. Case registered under IPC 420, 406 and IT Act 66C/66D. Cyber Cell begins digital forensic investigation. National Cybercrime Portal complaint ID: 2503210041872. <strong>Total loss confirmed: ₹8,40,000.</strong></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════ TAB: EVIDENCE ═══════════════════ -->
+    <div id="tab-evidence" class="tab-pane">
+      <div class="section-header">
+        <h2>Evidence Locker</h2>
+        <span class="sub">// CLICK ANY ARTIFACT TO EXAMINE IN DETAIL</span>
+      </div>
+      <p style="font-size:13px;color:var(--muted);margin-bottom:20px;font-family:var(--mono)">⚠ All evidence is synthetic and created for training purposes. Examine each artifact carefully — clues to the flags are hidden within.</p>
+
+      <div class="evidence-grid">
+        <!-- E1 -->
+        <div class="evidence-card" onclick="openModal('modal-chat')">
+          <div class="evidence-card-top">
+            <div class="ev-icon green">💬</div>
+            <div class="ev-info">
+              <div class="ev-title">WhatsApp Chat Log</div>
+              <div class="ev-sub">EXHIBIT A — EV-001-CHAT.PDF</div>
+            </div>
+            <span class="ev-badge chip-amber">KEY</span>
+          </div>
+          <div class="evidence-body">
+            Extracted conversation between victim and suspect "Priya Sharma" (+91-80762-14398). 47 messages over 19 days. Contains app download link and suspicious encoded string.
+            <div class="click-hint">► Click to examine full chat transcript</div>
+          </div>
+        </div>
+
+        <!-- E2 -->
+        <div class="evidence-card" onclick="openModal('modal-whois')">
+          <div class="evidence-card-top">
+            <div class="ev-icon blue">🌐</div>
+            <div class="ev-info">
+              <div class="ev-title">Domain WHOIS Report</div>
+              <div class="ev-sub">EXHIBIT B — EV-002-WHOIS.TXT</div>
+            </div>
+            <span class="ev-badge chip-red">SUSPECT</span>
+          </div>
+          <div class="evidence-body">
+            WHOIS lookup for tradepro-india.net — the fraudulent trading platform. Registration details, nameservers, and registrant data extracted by CERT-In.
+            <div class="click-hint">► Click to view WHOIS record</div>
+          </div>
+        </div>
+
+        <!-- E3 -->
+        <div class="evidence-card" onclick="openModal('modal-txn')">
+          <div class="evidence-card-top">
+            <div class="ev-icon red">🏦</div>
+            <div class="ev-info">
+              <div class="ev-title">Bank Statement & UPI Logs</div>
+              <div class="ev-sub">EXHIBIT C — EV-003-TXNLOG.XLSX</div>
+            </div>
+            <span class="ev-badge chip-red">CRITICAL</span>
+          </div>
+          <div class="evidence-body">
+            Victim's HDFC Bank statement (March 2025) with all 4 fraudulent UPI transactions. Mule account details and UTR numbers extracted for tracing.
+            <div class="click-hint">► Click to view transaction records</div>
+          </div>
+        </div>
+
+        <!-- E4 -->
+        <div class="evidence-card" onclick="openModal('modal-apk')">
+          <div class="evidence-card-top">
+            <div class="ev-icon amber">📱</div>
+            <div class="ev-info">
+              <div class="ev-title">APK Permissions Manifest</div>
+              <div class="ev-sub">EXHIBIT D — EV-004-MANIFEST.XML</div>
+            </div>
+            <span class="ev-badge chip-amber">MALWARE</span>
+          </div>
+          <div class="evidence-body">
+            AndroidManifest.xml extracted from TradePro India APK (tradepro_v2.1.apk). Lists all requested permissions — several are dangerously intrusive.
+            <div class="click-hint">► Click to view app permission manifest</div>
+          </div>
+        </div>
+
+        <!-- E5 -->
+        <div class="evidence-card" onclick="openModal('modal-exif')">
+          <div class="evidence-card-top">
+            <div class="ev-icon cyan">🖼️</div>
+            <div class="ev-info">
+              <div class="ev-title">Screenshot EXIF Metadata</div>
+              <div class="ev-sub">EXHIBIT E — EV-005-EXIF.TXT</div>
+            </div>
+            <span class="ev-badge chip-amber">CLUE</span>
+          </div>
+          <div class="evidence-body">
+            Metadata extracted from "profit screenshot" shared by Priya on WhatsApp. Image was downloaded and EXIF data extracted using ExifTool. Device locale and make/model data present.
+            <div class="click-hint">► Click to examine EXIF metadata</div>
+          </div>
+        </div>
+
+        <!-- E6 -->
+        <div class="evidence-card" onclick="openModal('modal-ip')">
+          <div class="evidence-card-top">
+            <div class="ev-icon red">🌍</div>
+            <div class="ev-info">
+              <div class="ev-title">IP Geolocation + Network Trace</div>
+              <div class="ev-sub">EXHIBIT F — EV-006-IPTRACE.TXT</div>
+            </div>
+            <span class="ev-badge chip-red">CRITICAL</span>
+          </div>
+          <div class="evidence-body">
+            APK server IP (103.27.8.142) and WhatsApp registration IP traced through ISP cooperation and MLAT. BGP ASN data and geolocation report included.
+            <div class="click-hint">► Click to view IP trace report</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════ TAB: CHALLENGES ═══════════════════ -->
+    <div id="tab-challenges" class="tab-pane">
+      <div class="section-header">
+        <h2>CTF Challenges</h2>
+        <span class="sub">// CAPTURE THE FLAGS — FORMAT: MPCCU{...}</span>
+      </div>
+
+      <div class="score-overview">
+        <div class="score-card">
+          <span class="big-num" id="score-num" style="color:var(--amber)">0</span>
+          <span class="label">POINTS EARNED</span>
+          <div class="progress-bar-wrap" style="margin-top:10px"><div class="progress-bar-fill" id="score-bar" style="width:0%"></div></div>
+        </div>
+        <div class="score-card">
+          <span class="big-num" id="flags-num" style="color:var(--green)">0</span>
+          <span class="label">FLAGS CAPTURED</span>
+          <div class="progress-bar-wrap" style="margin-top:10px"><div class="progress-bar-fill" id="flags-bar" style="width:0%;background:linear-gradient(90deg,var(--green),#4ade80)"></div></div>
+        </div>
+        <div class="score-card">
+          <span class="big-num" id="remain-num" style="color:var(--red)">6</span>
+          <span class="label">FLAGS REMAINING</span>
+        </div>
+      </div>
+
+      <!-- CHALLENGE 1 -->
+      <div class="challenge-card" id="ch1-card">
+        <div class="ch-header" onclick="toggleChallenge('ch1')">
+          <div class="ch-num diff-easy">1</div>
+          <div class="ch-info">
+            <div class="ch-title">WHOIS Warrior</div>
+            <div class="ch-meta">DIFFICULTY: EASY &nbsp;|&nbsp; CATEGORY: DOMAIN FORENSICS &nbsp;|&nbsp; EVIDENCE: EV-002</div>
+          </div>
+          <div class="ch-points">100 PTS</div>
+          <div class="ch-status" id="ch1-status">🔒</div>
+        </div>
+        <div class="ch-body" id="ch1-body">
+          <div class="challenge-desc">
+            Investigators, the fraudulent platform <strong>tradepro-india.net</strong> was taken offline before we could fully document it. However, CERT-In archived the WHOIS record before the domain was dropped. <br><br>
+            Your task: Examine the WHOIS report in Evidence EV-002. The domain was registered suspiciously close to when the victim was first contacted. <strong>What is the exact domain registration date?</strong> Enter it as your flag.
+          </div>
+          <div class="evidence-refs">
+            <div class="ref-label">REFER TO EVIDENCE:</div>
+            <span class="ev-ref-tag" onclick="openModal('modal-whois')">📄 EV-002 — WHOIS Report</span>
+          </div>
+          <div class="flag-input-area">
+            <span class="flag-label">FLAG:</span>
+            <input class="flag-input" id="flag1-input" type="text" placeholder="MPCCU{...}" autocomplete="off" spellcheck="false">
+            <button class="hint-btn" onclick="showHint('hint1')">💡 Hint</button>
+            <button class="submit-btn" onclick="checkFlag(1, 'MPCCU{domain_reg_20250227}')">SUBMIT</button>
+          </div>
+          <div class="hint-box" id="hint1">💡 Look at the "Creation Date" field in the WHOIS record. Format your answer as: MPCCU{domain_reg_YYYYMMDD}</div>
+          <div class="flag-result" id="result1"></div>
+        </div>
+      </div>
+
+      <!-- CHALLENGE 2 -->
+      <div class="challenge-card" id="ch2-card">
+        <div class="ch-header" onclick="toggleChallenge('ch2')">
+          <div class="ch-num diff-easy">2</div>
+          <div class="ch-info">
+            <div class="ch-title">Chat Decoder</div>
+            <div class="ch-meta">DIFFICULTY: EASY &nbsp;|&nbsp; CATEGORY: OSINT / CHAT ANALYSIS &nbsp;|&nbsp; EVIDENCE: EV-001</div>
+          </div>
+          <div class="ch-points">100 PTS</div>
+          <div class="ch-status" id="ch2-status">🔒</div>
+        </div>
+        <div class="ch-body" id="ch2-body">
+          <div class="challenge-desc">
+            In the WhatsApp chat, "Priya Sharma" sends a suspicious base64-encoded referral code: <code style="background:rgba(245,158,11,0.15);padding:2px 6px;border-radius:3px;font-family:var(--mono);color:var(--amber)">Q0FNQk9ESUEtT1BT</code><br><br>
+            When decoded, this reveals a critical 2-word phrase that tells investigators where the <strong>Operation Control Centre</strong> of this scam is located. Decode the string and submit the decoded value as your flag.
+          </div>
+          <div class="evidence-refs">
+            <div class="ref-label">REFER TO EVIDENCE:</div>
+            <span class="ev-ref-tag" onclick="openModal('modal-chat')">💬 EV-001 — WhatsApp Chat Log</span>
+          </div>
+          <div class="flag-input-area">
+            <span class="flag-label">FLAG:</span>
+            <input class="flag-input" id="flag2-input" type="text" placeholder="MPCCU{...}" autocomplete="off" spellcheck="false">
+            <button class="hint-btn" onclick="showHint('hint2')">💡 Hint</button>
+            <button class="submit-btn" onclick="checkFlag(2, 'MPCCU{CAMBODIA-OPS}')">SUBMIT</button>
+          </div>
+          <div class="hint-box" id="hint2">💡 Use a Base64 decoder (atob() in browser console or base64decode.org). The decoded string will reveal the Operation Control location. Format: MPCCU{DECODED_VALUE}</div>
+          <div class="flag-result" id="result2"></div>
+        </div>
+      </div>
+
+      <!-- CHALLENGE 3 -->
+      <div class="challenge-card" id="ch3-card">
+        <div class="ch-header" onclick="toggleChallenge('ch3')">
+          <div class="ch-num diff-medium">3</div>
+          <div class="ch-info">
+            <div class="ch-title">Money Mule Trail</div>
+            <div class="ch-meta">DIFFICULTY: MEDIUM &nbsp;|&nbsp; CATEGORY: FINANCIAL FORENSICS &nbsp;|&nbsp; EVIDENCE: EV-003</div>
+          </div>
+          <div class="ch-points">150 PTS</div>
+          <div class="ch-status" id="ch3-status">🔒</div>
+        </div>
+        <div class="ch-body" id="ch3-body">
+          <div class="challenge-desc">
+            Four UPI mule accounts received the victim's money. You must trace the money trail through the bank statement. <strong>Which mule account received the single largest transfer?</strong> Identify the UPI VPA (Virtual Payment Address) of that mule account and submit the registered bank's IFSC code as your flag.<br><br>
+            <em>Hint: Banks share first 4 characters of IFSC (bank code) + 0 + 6-digit branch code.</em>
+          </div>
+          <div class="evidence-refs">
+            <div class="ref-label">REFER TO EVIDENCE:</div>
+            <span class="ev-ref-tag" onclick="openModal('modal-txn')">🏦 EV-003 — Bank Statement & UPI Logs</span>
+          </div>
+          <div class="flag-input-area">
+            <span class="flag-label">FLAG:</span>
+            <input class="flag-input" id="flag3-input" type="text" placeholder="MPCCU{...}" autocomplete="off" spellcheck="false">
+            <button class="hint-btn" onclick="showHint('hint3')">💡 Hint</button>
+            <button class="submit-btn" onclick="checkFlag(3, 'MPCCU{YESB0000001}')">SUBMIT</button>
+          </div>
+          <div class="hint-box" id="hint3">💡 Look at the largest single transaction in EV-003. The VPA ends in @ybl — YBL stands for Yes Bank Limited. The flagship Yes Bank branch IFSC is YESB0000001. Format: MPCCU{IFSC_CODE}</div>
+          <div class="flag-result" id="result3"></div>
+        </div>
+      </div>
+
+      <!-- CHALLENGE 4 -->
+      <div class="challenge-card" id="ch4-card">
+        <div class="ch-header" onclick="toggleChallenge('ch4')">
+          <div class="ch-num diff-medium">4</div>
+          <div class="ch-info">
+            <div class="ch-title">App Trap — Permission Audit</div>
+            <div class="ch-meta">DIFFICULTY: MEDIUM &nbsp;|&nbsp; CATEGORY: MOBILE FORENSICS &nbsp;|&nbsp; EVIDENCE: EV-004</div>
+          </div>
+          <div class="ch-points">150 PTS</div>
+          <div class="ch-status" id="ch4-status">🔒</div>
+        </div>
+        <div class="ch-body" id="ch4-body">
+          <div class="challenge-desc">
+            The TradePro India APK was side-loaded (installed outside Play Store). Its AndroidManifest.xml has been extracted. <strong>Which specific Android permission allows the malicious app to intercept incoming OTP messages</strong> sent by banks for 2FA verification? This permission, if granted, would allow scammers to bypass OTP security.<br><br>
+            Submit the full permission string as your flag.
+          </div>
+          <div class="evidence-refs">
+            <div class="ref-label">REFER TO EVIDENCE:</div>
+            <span class="ev-ref-tag" onclick="openModal('modal-apk')">📱 EV-004 — APK Permissions Manifest</span>
+          </div>
+          <div class="flag-input-area">
+            <span class="flag-label">FLAG:</span>
+            <input class="flag-input" id="flag4-input" type="text" placeholder="MPCCU{...}" autocomplete="off" spellcheck="false">
+            <button class="hint-btn" onclick="showHint('hint4')">💡 Hint</button>
+            <button class="submit-btn" onclick="checkFlag(4, 'MPCCU{android.permission.RECEIVE_SMS}')">SUBMIT</button>
+          </div>
+          <div class="hint-box" id="hint4">💡 There are 2 SMS-related permissions. READ_SMS reads stored messages. The one that intercepts INCOMING messages in real-time is different. Look for the RECEIVE permission. Format: MPCCU{android.permission.XXXX_XXX}</div>
+          <div class="flag-result" id="result4"></div>
+        </div>
+      </div>
+
+      <!-- CHALLENGE 5 -->
+      <div class="challenge-card" id="ch5-card">
+        <div class="ch-header" onclick="toggleChallenge('ch5')">
+          <div class="ch-num diff-hard">5</div>
+          <div class="ch-info">
+            <div class="ch-title">Image Intelligence — EXIF Analysis</div>
+            <div class="ch-meta">DIFFICULTY: HARD &nbsp;|&nbsp; CATEGORY: DIGITAL FORENSICS &nbsp;|&nbsp; EVIDENCE: EV-005</div>
+          </div>
+          <div class="ch-points">175 PTS</div>
+          <div class="ch-status" id="ch5-status">🔒</div>
+        </div>
+        <div class="ch-body" id="ch5-body">
+          <div class="challenge-desc">
+            "Priya Sharma" shared a screenshot of her "trading profits" to convince Ramesh to invest more. Cyber forensics downloaded the image before the chat was deleted. <strong>The EXIF metadata reveals the true locale/language setting of the device</strong> that took the screenshot — proving the sender is NOT based in India.<br><br>
+            Examine EV-005 and identify the device locale code. Submit the 5-character locale identifier as your flag.
+          </div>
+          <div class="evidence-refs">
+            <div class="ref-label">REFER TO EVIDENCE:</div>
+            <span class="ev-ref-tag" onclick="openModal('modal-exif')">🖼️ EV-005 — Screenshot EXIF Metadata</span>
+          </div>
+          <div class="flag-input-area">
+            <span class="flag-label">FLAG:</span>
+            <input class="flag-input" id="flag5-input" type="text" placeholder="MPCCU{...}" autocomplete="off" spellcheck="false">
+            <button class="hint-btn" onclick="showHint('hint5')">💡 Hint</button>
+            <button class="submit-btn" onclick="checkFlag(5, 'MPCCU{zh-CN}')">SUBMIT</button>
+          </div>
+          <div class="hint-box" id="hint5">💡 Look at the "UserComment" or "Software" fields in the EXIF data. Device locale is in BCP-47 format: language code dash country code. zh = Chinese (Mandarin), CN = China. Format: MPCCU{xx-XX}</div>
+          <div class="flag-result" id="result5"></div>
+        </div>
+      </div>
+
+      <!-- CHALLENGE 6 -->
+      <div class="challenge-card" id="ch6-card">
+        <div class="ch-header" onclick="toggleChallenge('ch6')">
+          <div class="ch-num diff-hard">6</div>
+          <div class="ch-info">
+            <div class="ch-title">MASTER FLAG — Trace the Origin</div>
+            <div class="ch-meta">DIFFICULTY: HARD &nbsp;|&nbsp; CATEGORY: NETWORK + SYNTHESIS &nbsp;|&nbsp; EVIDENCE: ALL</div>
+          </div>
+          <div class="ch-points">175 PTS</div>
+          <div class="ch-status" id="ch6-status">🔒</div>
+        </div>
+        <div class="ch-body" id="ch6-body">
+          <div class="challenge-desc">
+            You have now examined all six pieces of evidence. Bring it all together:<br><br>
+            • The APK server IP (103.27.8.142) geolocates to a specific country<br>
+            • The Base64 decoded string in the chat confirms operation location<br>
+            • The EXIF device locale points to Chinese-speaking operators<br>
+            • The WHOIS registrar is based in a specific Southeast Asian country<br><br>
+            <strong>Based on all evidence combined — in which country is the Operation Control Centre (OCC) of this scam network located?</strong> Check EV-006 for the final confirmation. Submit the country name in UPPERCASE.
+          </div>
+          <div class="evidence-refs">
+            <div class="ref-label">REFER TO EVIDENCE (ALL):</div>
+            <span class="ev-ref-tag" onclick="openModal('modal-ip')">🌍 EV-006 — IP Trace Report</span>
+            <span class="ev-ref-tag" onclick="openModal('modal-chat')">💬 EV-001 — Chat Log</span>
+            <span class="ev-ref-tag" onclick="openModal('modal-whois')">🌐 EV-002 — WHOIS</span>
+            <span class="ev-ref-tag" onclick="openModal('modal-exif')">🖼️ EV-005 — EXIF</span>
+          </div>
+          <div class="flag-input-area">
+            <span class="flag-label">FLAG:</span>
+            <input class="flag-input" id="flag6-input" type="text" placeholder="MPCCU{...}" autocomplete="off" spellcheck="false">
+            <button class="hint-btn" onclick="showHint('hint6')">💡 Hint</button>
+            <button class="submit-btn" onclick="checkFlag(6, 'MPCCU{CAMBODIA}')">SUBMIT</button>
+          </div>
+          <div class="hint-box" id="hint6">💡 Cambodia is a known hub for Chinese-operated cyber scam compounds, particularly in Sihanoukville and Phnom Penh. The IP, base64 hint, and WHOIS all point to the same country. Format: MPCCU{COUNTRY_NAME}</div>
+          <div class="flag-result" id="result6"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════ TAB: TRAINER ═══════════════════ -->
+    <div id="tab-trainer" class="tab-pane">
+      <div class="section-header">
+        <h2>Trainer's Guide</h2>
+        <span class="sub">// SESSION PLAN & ANSWER KEY — RESTRICTED</span>
+      </div>
+
+      <div class="trainer-card">
+        <div class="t-header">📌 Session Overview</div>
+        <p>This CTF exercise is designed to follow a 45–60 minute awareness session on <strong>Pig Butchering Scams and Investment Fraud</strong>. It is best run as a team exercise (teams of 2-3 officers) with 60 minutes to solve all 6 challenges. The exercise reinforces digital forensics skills critical to cybercrime investigation.</p>
+      </div>
+
+      <div class="trainer-card">
+        <div class="t-header">🎯 Learning Objectives</div>
+        <ul>
+          <li>Understand the anatomy of a Pig Butchering / Investment Fraud operation</li>
+          <li>Learn how to read and interpret WHOIS records for domain-based investigations</li>
+          <li>Practice Base64 decoding as a basic cryptography skill</li>
+          <li>Trace UPI/banking transactions through mule account chains</li>
+          <li>Perform mobile app permission audits for malware identification</li>
+          <li>Extract and interpret image EXIF metadata as forensic evidence</li>
+          <li>Correlate IP geolocation data with international cybercrime networks</li>
+        </ul>
+      </div>
+
+      <div class="trainer-card">
+        <div class="t-header">⏱ Suggested Session Plan</div>
+        <ul>
+          <li><strong>0:00 – 0:45</strong> — Awareness lecture: How Pig Butchering works, case studies from Cyber Cell Mumbai, legal framework (IPC 420, IT Act 66C/66D, Prevention of Money Laundering Act)</li>
+          <li><strong>0:45 – 0:50</strong> — Form teams (2-3 officers per team). Distribute this CTF platform.</li>
+          <li><strong>0:50 – 1:45</strong> — Teams work through challenges. Trainers circulate. Do NOT give direct answers — guide with questions.</li>
+          <li><strong>1:45 – 2:00</strong> — Debrief. Reveal answers. Discuss investigative steps each flag represents.</li>
+          <li><strong>2:00 – 2:15</strong> — Q&A: How to actually file MLAT requests, how to work with CERT-In, how to freeze mule accounts within the 1930 golden hour.</li>
+        </ul>
+      </div>
+
+      <div class="trainer-card">
+        <div class="t-header">🔑 Key Training Points to Emphasize</div>
+        <ul>
+          <li><strong>The Golden Hour:</strong> Money moved through mule accounts can be frozen if reported to 1930 (National Cybercrime Helpline) within 1 hour. Every minute matters.</li>
+          <li><strong>Never install APKs outside Play Store:</strong> Emphasize this to victims during awareness — sideloading is a massive red flag.</li>
+          <li><strong>VoIP Numbers are not traceable via normal channels:</strong> Teach officers to use TRAI's VoIP database and how to file a request to the telecom provider.</li>
+          <li><strong>SEBI/RBI never ask for payments:</strong> This is a hard rule. Any call claiming to be from a regulator asking for money is a scam.</li>
+          <li><strong>Pig Butchering is a global crime:</strong> Most operations run from SEA (Cambodia, Myanmar, Laos). Cases require MLAT (Mutual Legal Assistance Treaty) requests to prosecute operators.</li>
+          <li><strong>Image metadata is evidence:</strong> EXIF data from images shared by scammers can reveal device info, location, and timezone. Always extract before evidence is deleted.</li>
+        </ul>
+      </div>
+
+      <div class="trainer-card">
+        <div class="t-header">📞 Key Resources to Share With Officers</div>
+        <ul>
+          <li><strong>1930</strong> — National Cybercrime Helpline (freeze fraudulent transactions)</li>
+          <li><strong>cybercrime.gov.in</strong> — National Cybercrime Reporting Portal</li>
+          <li><strong>CERT-In</strong> — cert-in.org.in (for domain/IP investigation support)</li>
+          <li><strong>RBI's UDGAM Portal</strong> — Trace unclaimed bank accounts</li>
+          <li><strong>I4C (Indian Cybercrime Coordination Centre)</strong> — For inter-state and international cases</li>
+        </ul>
+      </div>
+
+      <!-- ANSWER KEY -->
+      <div class="answer-key">
+        <div class="ak-header">
+          <div class="ak-title">🔐 TRAINER ANSWER KEY — RESTRICTED</div>
+          <button class="lock-btn" onclick="toggleAnswerKey()">🔓 REVEAL ANSWERS</button>
+        </div>
+        <div class="ak-body" id="ak-body">
+          <div class="ak-row"><span class="ak-ch-num">CH.1</span><span class="ak-ch-name">WHOIS Warrior — Domain Registration Date</span><span class="ak-flag">MPCCU{domain_reg_20250227}</span></div>
+          <div class="ak-row"><span class="ak-ch-num">CH.2</span><span class="ak-ch-name">Chat Decoder — Base64 Operation Location</span><span class="ak-flag">MPCCU{CAMBODIA-OPS}</span></div>
+          <div class="ak-row"><span class="ak-ch-num">CH.3</span><span class="ak-ch-name">Money Mule Trail — Largest Transfer IFSC</span><span class="ak-flag">MPCCU{YESB0000001}</span></div>
+          <div class="ak-row"><span class="ak-ch-num">CH.4</span><span class="ak-ch-name">App Trap — OTP Interception Permission</span><span class="ak-flag">MPCCU{android.permission.RECEIVE_SMS}</span></div>
+          <div class="ak-row"><span class="ak-ch-num">CH.5</span><span class="ak-ch-name">EXIF Analysis — Device Locale</span><span class="ak-flag">MPCCU{zh-CN}</span></div>
+          <div class="ak-row"><span class="ak-ch-num">CH.6</span><span class="ak-ch-name">Master Flag — Operation Country</span><span class="ak-flag">MPCCU{CAMBODIA}</span></div>
+        </div>
+      </div>
+
+      <div class="content-footer">
+        MUMBAI POLICE CYBER CRIME UNIT &nbsp;|&nbsp; TRAINING DIVISION &nbsp;|&nbsp; OPERATION STOCKMIRAGE &nbsp;|&nbsp; FY 2025-26<br>
+        THIS IS A SYNTHETIC TRAINING EXERCISE. ALL NAMES, NUMBERS, AND TRANSACTIONS ARE FICTIONAL.
+      </div>
+    </div>
+
+  </div><!-- end .content -->
+</div><!-- end .main -->
+
+<!-- ═══════════════════ MODALS ═══════════════════ -->
+
+<!-- MODAL: CHAT -->
+<div class="modal-overlay" id="modal-chat">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">EXHIBIT A — EV-001-CHAT // WHATSAPP TRANSCRIPT</span>
+      <div class="modal-close" onclick="closeModal('modal-chat')">✕</div>
+    </div>
+    <div class="modal-body">
+      <p style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:12px">Extracted via WhatsApp backup (.crypt15) | Date range: 02 Mar – 19 Mar 2025 | Contact: +91-80762-14398</p>
+      <div class="chat-window">
+        <div class="chat-topbar">
+          <div class="chat-avatar">P</div>
+          <div class="chat-contact">
+            <div class="chat-contact-name">Priya Sharma 📈</div>
+            <div class="chat-contact-status">+91 80762 14398 · last seen today at 2:31 AM</div>
+          </div>
+        </div>
+        <div class="chat-messages">
+          <div class="msg msg-in">Hi! I saw you in the Mumbai Elite Traders group. I'm Priya, financial analyst at BKC. Nice to connect 😊<div class="msg-time">02 Mar · 3:17 PM</div></div>
+          <div class="msg msg-out">Hi Priya! Yes I joined recently. The tips from Dr. Kapoor look interesting<div class="msg-time">02 Mar · 3:45 PM</div></div>
+          <div class="msg msg-in">Yes he's amazing! I've made ₹2.3L this month alone using his exclusive platform. It's invite-only so not everyone knows 🙂<div class="msg-time">02 Mar · 3:52 PM</div></div>
+          <div class="msg msg-in">Are you into stock markets? What do you do?<div class="msg-time">02 Mar · 3:53 PM</div></div>
+          <div class="msg msg-out">I'm a CA. I have savings I want to put to work but always been cautious about trading<div class="msg-time">02 Mar · 4:10 PM</div></div>
+          <div class="msg msg-in">Arey perfect! CAs are great investors, you understand numbers! I was the same — cautious until my colleague showed me TradePro India. Genuinely changed my life 🙏<div class="msg-time">02 Mar · 4:18 PM</div></div>
+          <div class="msg msg-in">Let me share my portfolio screenshot so you can see what's possible<div class="msg-time">05 Mar · 10:02 AM</div></div>
+          <div class="msg msg-in">[📷 Screenshot: Portfolio showing ₹4,82,400 profit — 15 Mar snapshot]<div class="msg-time">05 Mar · 10:04 AM</div></div>
+          <div class="msg msg-in">Here's the download link for TradePro app. It's not on Play Store (they keep getting copied so they do direct APK). Use my referral code so you get ₹500 bonus:<br><br>
+            <span class="msg-link">http://103.27.8.142/downloads/tradepro_v2.1.apk</span><br><br>
+            Referral: <strong>Q0FNQk9ESUEtT1BT</strong>
+            <div class="clue-flag">⚑ CLUE — This referral code is Base64 encoded. What does it say?</div>
+            <div class="msg-time">05 Mar · 10:08 AM</div>
+          </div>
+          <div class="msg msg-out">Downloaded! Registering now. Thanks Priya 😊<div class="msg-time">05 Mar · 11:33 AM</div></div>
+          <div class="msg msg-in">Great! Vikram from their support will call you to verify your account. He's very helpful<div class="msg-time">05 Mar · 11:40 AM</div></div>
+          <div class="msg msg-in">How much are you planning to start with? I started with ₹20,000 and grew it 10x in 3 months 😍<div class="msg-time">10 Mar · 9:00 AM</div></div>
+          <div class="msg msg-out">Maybe 75,000? Let me try and see<div class="msg-time">10 Mar · 9:05 AM</div></div>
+          <div class="msg msg-in">That's perfect! IPO window opens tomorrow — best time to invest. I'm putting ₹5L more myself!<div class="msg-time">10 Mar · 9:09 AM</div></div>
+          <div class="msg msg-in">Rameshji your portfolio is showing ₹1,42,000 already! 89% profit in 3 days 🔥🔥<div class="msg-time">13 Mar · 8:30 AM</div></div>
+          <div class="msg msg-out">Wow that's incredible! Should I put more in?<div class="msg-time">13 Mar · 8:45 AM</div></div>
+          <div class="msg msg-in">YES! Special IPO closes TODAY at 4PM. Minimum ₹3L to get the best allocation. I'm putting ₹10L 😊<div class="msg-time">13 Mar · 9:01 AM</div></div>
+          <div class="msg msg-in">Rameshji don't worry about the GST error. It happened to me too. You just need to pay the 18% GST (SEBI rule) and the withdrawal processes immediately. I paid and got my money same day<div class="msg-time">15 Mar · 3:50 PM</div></div>
+          <div class="msg msg-out">OK I'll pay. But this is the last time — I need my money<div class="msg-time">15 Mar · 4:15 PM</div></div>
+          <div class="msg msg-in">Of course! After the RBI audit clears it will all come. The audit fee is just a formality, refunded in 4 hours<div class="msg-time">17 Mar · 1:55 PM</div></div>
+          <div style="text-align:center;padding:12px;font-family:var(--mono);font-size:10px;color:rgba(255,255,255,0.3)">— Messages after 19 Mar: No response. Contact deleted. —</div>
+        </div>
+      </div>
+      <div style="margin-top:14px;font-family:var(--mono);font-size:11px;color:var(--muted)">
+        ⚠ NOTE: Suspect was online between 11 PM – 3 AM IST consistently (suggests UTC+7 timezone — approx. Cambodia/Thailand).<br>
+        ⚑ Referral code <strong>Q0FNQk9ESUEtT1BT</strong> is Base64. Decode it for Challenge 2.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: WHOIS -->
+<div class="modal-overlay" id="modal-whois">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">EXHIBIT B — EV-002 // DOMAIN WHOIS REPORT</span>
+      <div class="modal-close" onclick="closeModal('modal-whois')">✕</div>
+    </div>
+    <div class="modal-body">
+      <p style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:12px">Source: CERT-In archived WHOIS query | Domain: tradepro-india.net | Queried: 21 Mar 2025</p>
+      <div class="whois-block">
+        <div><span class="whois-key">Domain Name:          </span><span class="whois-val">tradepro-india.net</span></div>
+        <div><span class="whois-key">Registry Domain ID:   </span><span class="whois-val">D402200000085492-LROR</span></div>
+        <div><span class="whois-key">Registrar WHOIS:      </span><span class="whois-val">whois.namecheap.com</span></div>
+        <div><span class="whois-key">Registrar:            </span><span class="whois-val">NameCheap Inc. (Phnom Penh gateway)</span></div>
+        <div><span class="whois-key">Registrar IANA ID:    </span><span class="whois-val">1068</span></div>
+        <div><span class="whois-key">Domain Status:        </span><span class="whois-val">clientTransferProhibited</span></div>
+        <div>&nbsp;</div>
+        <div><span class="whois-key">Creation Date:        </span><span class="whois-highlight">2025-02-27T08:14:22Z</span></div>
+        <div><span class="whois-key">Updated Date:         </span><span class="whois-val">2025-02-27T08:14:24Z</span></div>
+        <div><span class="whois-key">Registry Expiry Date: </span><span class="whois-val">2026-02-27T08:14:22Z</span></div>
+        <div>&nbsp;</div>
+        <div><span class="whois-key">Registrant Name:      </span><span class="whois-val">Privacy Protected (WhoisGuard)</span></div>
+        <div><span class="whois-key">Registrant Org:       </span><span class="whois-val">WhoisGuard, Inc.</span></div>
+        <div><span class="whois-key">Registrant Street:    </span><span class="whois-val">P.O. Box 0823-03411</span></div>
+        <div><span class="whois-key">Registrant City:      </span><span class="whois-val">Panama City</span></div>
+        <div><span class="whois-key">Registrant Country:   </span><span class="whois-val">PA</span></div>
+        <div>&nbsp;</div>
+        <div><span class="whois-key">Name Server:          </span><span class="whois-val">ns1.cloudflare-kh.net</span></div>
+        <div><span class="whois-key">Name Server:          </span><span class="whois-val">ns2.cloudflare-kh.net</span></div>
+        <div>&nbsp;</div>
+        <div><span class="whois-key">Registrar Abuse Contact Email: </span><span class="whois-val">abuse@namecheap.com</span></div>
+        <div><span class="whois-key">Registrar Abuse Phone:         </span><span class="whois-val">+1.6613102107</span></div>
+        <div>&nbsp;</div>
+        <div><span class="whois-key">DNSSEC:               </span><span class="whois-val">unsigned</span></div>
+        <div><span class="whois-key">>>> Last update of WHOIS: 2025-03-21T04:32:01Z <<<</span></div>
+      </div>
+      <div style="margin-top:14px;padding:12px;background:rgba(245,158,11,0.08);border:1px dashed rgba(245,158,11,0.3);border-radius:4px;font-family:var(--mono);font-size:11px;color:var(--amber)">
+        ⚑ INVESTIGATOR NOTE: Domain was registered on <strong>27 February 2025</strong> — exactly 2 days before victim was first contacted (01 March 2025). This is a classic pattern of "build, scam, abandon" domains. Flag answer format: MPCCU{domain_reg_YYYYMMDD}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: TRANSACTIONS -->
+<div class="modal-overlay" id="modal-txn">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">EXHIBIT C — EV-003 // BANK STATEMENT & UPI LOGS</span>
+      <div class="modal-close" onclick="closeModal('modal-txn')">✕</div>
+    </div>
+    <div class="modal-body">
+      <p style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:12px">Source: HDFC Bank statement — Account ending 4821 | Account holder: Ramesh D. Kulkarni | Period: March 2025</p>
+      <div style="overflow-x:auto">
+      <table class="tx-table">
+        <thead>
+          <tr><th>Date</th><th>Description</th><th>UPI VPA (Recipient)</th><th>UTR No.</th><th>Amount</th><th>Bank (VPA Suffix)</th><th>Status</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>10 Mar 2025</td>
+            <td>UPI/DR/TRADEPRO INVESTMENT</td>
+            <td class="tx-mule">varun.trading@paytm</td>
+            <td>PYTM25031000000412</td>
+            <td class="tx-debit">- ₹75,000</td>
+            <td>Paytm Payments Bank</td>
+            <td><span class="status-chip chip-red">FROZEN</span></td>
+          </tr>
+          <tr class="tx-suspect">
+            <td>13 Mar 2025</td>
+            <td>UPI/DR/IPO ALLOCATION FEE</td>
+            <td class="tx-mule">profits.india2024@ybl</td>
+            <td>YESB25031300002891</td>
+            <td class="tx-debit">- ₹3,00,000</td>
+            <td>Yes Bank Ltd (YBL)</td>
+            <td><span class="status-chip chip-red">FORWARDED</span></td>
+          </tr>
+          <tr>
+            <td>15 Mar 2025</td>
+            <td>UPI/DR/GST COLLECTION SEBI</td>
+            <td class="tx-mule">gst.collect.india@okaxis</td>
+            <td>AXSB25031500008821</td>
+            <td class="tx-debit">- ₹2,00,000</td>
+            <td>Axis Bank (OKAXIS)</td>
+            <td><span class="status-chip chip-red">FORWARDED</span></td>
+          </tr>
+          <tr>
+            <td>17 Mar 2025</td>
+            <td>UPI/DR/RBI AUDIT CLEARANCE</td>
+            <td class="tx-mule">rbi.clearance88@okhdfc</td>
+            <td>HDFC25031700014423</td>
+            <td class="tx-debit">- ₹1,65,000</td>
+            <td>HDFC Bank (OKHDFC)</td>
+            <td><span class="status-chip chip-red">FROZEN</span></td>
+          </tr>
+        </tbody>
+      </table>
+      </div>
+      <div style="margin-top:14px;display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div style="background:var(--bg);border:1px solid var(--border);padding:12px;border-radius:4px;font-family:var(--mono);font-size:11px">
+          <div style="color:var(--muted);margin-bottom:6px">TOTAL DEBITED</div>
+          <div style="color:var(--red);font-size:20px;font-weight:700">₹ 8,40,000</div>
+        </div>
+        <div style="background:var(--bg);border:1px solid var(--border);padding:12px;border-radius:4px;font-family:var(--mono);font-size:11px">
+          <div style="color:var(--muted);margin-bottom:6px">LARGEST SINGLE TX</div>
+          <div style="color:var(--amber);font-size:20px;font-weight:700">₹ 3,00,000</div>
+          <div style="color:var(--muted);font-size:10px;margin-top:4px">profits.india2024@ybl → Yes Bank Ltd</div>
+        </div>
+      </div>
+      <div style="margin-top:12px;font-family:var(--mono);font-size:11px;color:var(--amber);padding:10px;background:rgba(245,158,11,0.06);border:1px dashed rgba(245,158,11,0.3);border-radius:4px">
+        ⚑ INVESTIGATOR NOTE: The Yes Bank VPA suffix is @ybl. Yes Bank's IFSC format: YESB followed by 7 digits. The flagship/main branch IFSC is YESB0000001. This is your flag for Challenge 3.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: APK -->
+<div class="modal-overlay" id="modal-apk">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">EXHIBIT D — EV-004 // APK PERMISSION MANIFEST</span>
+      <div class="modal-close" onclick="closeModal('modal-apk')">✕</div>
+    </div>
+    <div class="modal-body">
+      <p style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:12px">Source: AndroidManifest.xml extracted from tradepro_v2.1.apk using APKTool | SHA256: a3f9c2d1e8b7...</p>
+      <div style="font-family:var(--mono);font-size:11px;background:var(--bg);padding:12px;border-radius:4px;color:var(--muted);margin-bottom:14px">
+        &lt;?xml version="1.0" encoding="utf-8"?&gt;<br>
+        &lt;manifest package="<span style="color:var(--amber)">com.tradepro.india.app</span>" android:versionName="2.1"&gt;<br>
+        &nbsp;&nbsp;&lt;uses-sdk android:minSdkVersion="21" android:targetSdkVersion="33"/&gt;
+      </div>
+      <ul class="perm-list">
+        <li class="perm-item normal"><span class="perm-icon">📶</span><span class="perm-name">android.permission.INTERNET</span><span class="perm-desc">Standard — required for all apps</span></li>
+        <li class="perm-item normal"><span class="perm-icon">🔔</span><span class="perm-name">android.permission.RECEIVE_BOOT_COMPLETED</span><span class="perm-desc">Runs on device restart</span></li>
+        <li class="perm-item warn"><span class="perm-icon">📍</span><span class="perm-name">android.permission.ACCESS_FINE_LOCATION</span><span class="perm-desc">⚠ Why does a trading app need precise GPS?</span></li>
+        <li class="perm-item warn"><span class="perm-icon">📷</span><span class="perm-name">android.permission.CAMERA</span><span class="perm-desc">⚠ Claimed for "KYC photo" — suspicious</span></li>
+        <li class="perm-item warn"><span class="perm-icon">📞</span><span class="perm-name">android.permission.READ_CALL_LOG</span><span class="perm-desc">⚠ No legitimate reason for this</span></li>
+        <li class="perm-item danger"><span class="perm-icon">📨</span><span class="perm-name">android.permission.READ_SMS</span><span class="perm-desc">🚨 Reads all stored SMS messages</span></li>
+        <li class="perm-item danger"><span class="perm-icon">📩</span><span class="perm-name">android.permission.RECEIVE_SMS</span><span class="perm-desc">🚨 INTERCEPTS INCOMING SMS IN REAL-TIME — steals OTPs</span></li>
+        <li class="perm-item danger"><span class="perm-icon">📤</span><span class="perm-name">android.permission.SEND_SMS</span><span class="perm-desc">🚨 Can send SMS from victim's number</span></li>
+        <li class="perm-item warn"><span class="perm-icon">👁</span><span class="perm-name">android.permission.READ_CONTACTS</span><span class="perm-desc">⚠ Harvests victim's contact list</span></li>
+        <li class="perm-item warn"><span class="perm-icon">🗃</span><span class="perm-name">android.permission.READ_EXTERNAL_STORAGE</span><span class="perm-desc">⚠ Reads files on device</span></li>
+        <li class="perm-item normal"><span class="perm-icon">💾</span><span class="perm-name">android.permission.WRITE_EXTERNAL_STORAGE</span><span class="perm-desc">Standard storage write</span></li>
+        <li class="perm-item danger"><span class="perm-icon">🔑</span><span class="perm-name">android.permission.BIND_ACCESSIBILITY_SERVICE</span><span class="perm-desc">🚨 Can read and interact with ALL on-screen content</span></li>
+        <li class="perm-item normal"><span class="perm-icon">🌐</span><span class="perm-name">android.permission.CHANGE_NETWORK_STATE</span><span class="perm-desc">Network switching</span></li>
+        <li class="perm-item warn"><span class="perm-icon">🔕</span><span class="perm-name">android.permission.PROCESS_OUTGOING_CALLS</span><span class="perm-desc">⚠ Intercepts and modifies outgoing calls</span></li>
+      </ul>
+      <div style="margin-top:14px;font-family:var(--mono);font-size:11px;color:var(--red);padding:10px;background:rgba(239,68,68,0.06);border:1px dashed rgba(239,68,68,0.3);border-radius:4px">
+        🚨 CRITICAL: RECEIVE_SMS intercepts incoming OTP messages before they reach the victim's notification bar. This allows scammers to bypass bank 2FA in real-time. This is the key permission for Challenge 4.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: EXIF -->
+<div class="modal-overlay" id="modal-exif">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">EXHIBIT E — EV-005 // IMAGE EXIF METADATA</span>
+      <div class="modal-close" onclick="closeModal('modal-exif')">✕</div>
+    </div>
+    <div class="modal-body">
+      <p style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:12px">Source: "portfolio_profit.jpg" forwarded by suspect on WhatsApp | Tool: ExifTool v12.70 | Extracted: 21 Mar 2025</p>
+      <div style="background:var(--bg);border:1px solid var(--border);padding:14px;border-radius:4px;font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:12px">
+        $ exiftool portfolio_profit.jpg
+      </div>
+      <table class="exif-table">
+        <tr><td class="exif-key">ExifTool Version Number</td><td class="exif-val">12.70</td></tr>
+        <tr><td class="exif-key">File Name</td><td class="exif-val">portfolio_profit.jpg</td></tr>
+        <tr><td class="exif-key">File Type</td><td class="exif-val">JPEG</td></tr>
+        <tr><td class="exif-key">MIME Type</td><td class="exif-val">image/jpeg</td></tr>
+        <tr><td class="exif-key">Image Width</td><td class="exif-val">1080</td></tr>
+        <tr><td class="exif-key">Image Height</td><td class="exif-val">2400</td></tr>
+        <tr><td class="exif-key">Make</td><td class="exif-val sus">Xiaomi</td></tr>
+        <tr><td class="exif-key">Camera Model Name</td><td class="exif-val sus">Redmi Note 11 Pro</td></tr>
+        <tr><td class="exif-key">Software</td><td class="exif-val sus">MIUI 14.0 zh-CN</td></tr>
+        <tr><td class="exif-key">Modify Date</td><td class="exif-val">2025:03:12 23:18:44</td></tr>
+        <tr><td class="exif-key">Create Date</td><td class="exif-val">2025:03:12 23:18:44</td></tr>
+        <tr><td class="exif-key">Date/Time Original</td><td class="exif-val">2025:03:12 23:18:44</td></tr>
+        <tr><td class="exif-key">Offset Time</td><td class="exif-val sus">+07:00</td></tr>
+        <tr><td class="exif-key">Color Space</td><td class="exif-val">sRGB</td></tr>
+        <tr><td class="exif-key">Exif Image Width</td><td class="exif-val">1080</td></tr>
+        <tr><td class="exif-key">Exif Image Height</td><td class="exif-val">2400</td></tr>
+        <tr><td class="exif-key">User Comment</td><td class="exif-val sus">locale=zh-CN | MUI_Global_14.0.6</td></tr>
+        <tr><td class="exif-key">GPS Latitude</td><td class="exif-val">[STRIPPED BY WHATSAPP]</td></tr>
+        <tr><td class="exif-key">GPS Longitude</td><td class="exif-val">[STRIPPED BY WHATSAPP]</td></tr>
+        <tr><td class="exif-key">Compression</td><td class="exif-val">JPEG (old-style)</td></tr>
+        <tr><td class="exif-key">X Resolution</td><td class="exif-val">72</td></tr>
+        <tr><td class="exif-key">Y Resolution</td><td class="exif-val">72</td></tr>
+        <tr><td class="exif-key">Resolution Unit</td><td class="exif-val">inches</td></tr>
+      </table>
+      <div style="margin-top:14px;font-family:var(--mono);font-size:11px;color:var(--amber);padding:10px;background:rgba(245,158,11,0.06);border:1px dashed rgba(245,158,11,0.3);border-radius:4px">
+        ⚑ KEY FINDINGS:<br>
+        • Device timezone: <strong>+07:00</strong> (Indochina Time — Cambodia/Thailand/Vietnam)<br>
+        • MIUI Software: <strong>zh-CN</strong> — Chinese (Simplified) locale. NOT Indian (hi-IN or en-IN).<br>
+        • UserComment field explicitly states: <strong>locale=zh-CN</strong><br>
+        • GPS data was stripped by WhatsApp compression (expected behavior)<br><br>
+        This device belongs to a Chinese-language user in UTC+7 timezone. Flag for Challenge 5: MPCCU{zh-CN}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: IP TRACE -->
+<div class="modal-overlay" id="modal-ip">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">EXHIBIT F — EV-006 // IP GEOLOCATION & NETWORK TRACE</span>
+      <div class="modal-close" onclick="closeModal('modal-ip')">✕</div>
+    </div>
+    <div class="modal-body">
+      <p style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:12px">Source: CERT-In IP Investigation | Target IP: 103.27.8.142 | Method: ISP MLAT Request + BGP Routing Analysis</p>
+      <div class="whois-block">
+        <div style="color:var(--amber);margin-bottom:8px">═══ IP GEOLOCATION REPORT ═══</div>
+        <div><span class="whois-key">IP Address:           </span><span class="whois-val">103.27.8.142</span></div>
+        <div><span class="whois-key">IP Version:           </span><span class="whois-val">IPv4</span></div>
+        <div><span class="whois-key">PTR (Reverse DNS):    </span><span class="whois-val">server142.kh-dc-ph.net</span></div>
+        <div>&nbsp;</div>
+        <div><span class="whois-key">ASN:                  </span><span class="whois-val">AS55329</span></div>
+        <div><span class="whois-key">AS Name:              </span><span class="whois-val">ANGKOR-DATA-KH</span></div>
+        <div><span class="whois-key">AS Description:       </span><span class="whois-highlight">Angkor Data Centre Pvt. Ltd. — Phnom Penh, Cambodia</span></div>
+        <div>&nbsp;</div>
+        <div><span class="whois-key">Country:              </span><span class="whois-highlight">KH — CAMBODIA 🇰🇭</span></div>
+        <div><span class="whois-key">Region:               </span><span class="whois-val">Phnom Penh</span></div>
+        <div><span class="whois-key">City:                 </span><span class="whois-val">Phnom Penh (Toul Kork District)</span></div>
+        <div><span class="whois-key">Coordinates:          </span><span class="whois-val">11.5564° N, 104.9282° E</span></div>
+        <div><span class="whois-key">ISP:                  </span><span class="whois-val">Angkor Data Centre / Metfone Cambodia</span></div>
+        <div><span class="whois-key">Timezone:             </span><span class="whois-val">Asia/Phnom_Penh (UTC+7)</span></div>
+        <div>&nbsp;</div>
+        <div><span class="whois-key">Hosting Type:         </span><span class="whois-val">Dedicated Server (Bare Metal)</span></div>
+        <div><span class="whois-key">Abuse Contact:        </span><span class="whois-val">abuse@angkordata.kh (unresponsive)</span></div>
+        <div>&nbsp;</div>
+        <div style="color:var(--amber);margin:8px 0">═══ MLAT STATUS ═══</div>
+        <div><span class="whois-key">MLAT Filed:           </span><span class="whois-val">22 Mar 2025 (via MEA — Ministry of External Affairs)</span></div>
+        <div><span class="whois-key">Treaty:               </span><span class="whois-val">India-Cambodia MLAT (signed 2019)</span></div>
+        <div><span class="whois-key">Expected Response:    </span><span class="whois-val">4–8 weeks (server logs)</span></div>
+        <div>&nbsp;</div>
+        <div style="color:var(--amber);margin:8px 0">═══ WHATSAPP REGISTRATION IP ═══</div>
+        <div><span class="whois-key">Number:               </span><span class="whois-val">+91-80762-14398 (Indian VoIP — TextLocal)</span></div>
+        <div><span class="whois-key">WA Registration IP:   </span><span class="whois-val">103.27.8.89</span></div>
+        <div><span class="whois-key">Registered From:      </span><span class="whois-highlight">Same ASN — Angkor Data Centre, Phnom Penh, CAMBODIA</span></div>
+        <div><span class="whois-key">VPN/Proxy Used:       </span><span class="whois-val">Yes — NordVPN endpoint (masked)</span></div>
+        <div>&nbsp;</div>
+        <div style="color:var(--red)">⚠ INTEL NOTE: Sihanoukville and Phnom Penh, Cambodia are known hubs for Chinese-run cyber scam compounds. Thousands of Indian victims have been defrauded from these locations. Multiple CBI-Interpol alerts issued.</div>
+      </div>
+      <div style="margin-top:14px;font-family:var(--mono);font-size:11px;color:var(--green);padding:10px;background:rgba(34,197,94,0.06);border:1px dashed rgba(34,197,94,0.3);border-radius:4px">
+        ✓ CONCLUSION: All digital traces (APK server, WhatsApp registration IP, WHOIS nameserver geography, EXIF timezone UTC+7, Base64 decoded string) converge on CAMBODIA as the Operation Control Centre. This is your Master Flag for Challenge 6.
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ─── Navigation ───
+  function showTab(id, el) {
+    document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    document.getElementById('tab-' + id).classList.add('active');
+    el.classList.add('active');
+  }
+
+  // ─── Modals ───
+  function openModal(id) {
+    document.getElementById(id).classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeModal(id) {
+    document.getElementById(id).classList.remove('open');
+    document.body.style.overflow = '';
+  }
+  document.querySelectorAll('.modal-overlay').forEach(o => {
+    o.addEventListener('click', e => { if(e.target === o) { o.classList.remove('open'); document.body.style.overflow=''; } });
+  });
+
+  // ─── Challenge toggle ───
+  function toggleChallenge(id) {
+    const body = document.getElementById(id + '-body');
+    body.classList.toggle('open');
+  }
+
+  // ─── Scoring ───
+  let totalScore = 0;
+  let flagsCaptured = 0;
+  const flagPoints = {1:100, 2:100, 3:150, 4:150, 5:175, 6:175};
+  const flagSolved = {1:false,2:false,3:false,4:false,5:false,6:false};
+
+  function checkFlag(num, answer) {
+    const input = document.getElementById('flag' + num + '-input');
+    const result = document.getElementById('result' + num);
+    const val = input.value.trim();
+
+    if (flagSolved[num]) {
+      result.textContent = '✓ Already captured!';
+      result.className = 'flag-result show success';
+      return;
+    }
+
+    if (val.toLowerCase() === answer.toLowerCase()) {
+      input.classList.remove('wrong');
+      input.classList.add('correct');
+      result.className = 'flag-result show success';
+      result.textContent = '🚩 FLAG CAPTURED! +' + flagPoints[num] + ' points. Well done, Officer!';
+      flagSolved[num] = true;
+      document.getElementById('ch' + num + '-status').textContent = '✅';
+      document.getElementById('ch' + num + '-card').classList.add('solved');
+
+      totalScore += flagPoints[num];
+      flagsCaptured++;
+
+      document.getElementById('score-num').textContent = totalScore;
+      document.getElementById('flags-num').textContent = flagsCaptured;
+      document.getElementById('remain-num').textContent = 6 - flagsCaptured;
+      document.getElementById('score-bar').style.width = (totalScore/600*100) + '%';
+      document.getElementById('flags-bar').style.width = (flagsCaptured/6*100) + '%';
+      document.getElementById('sidebar-score').textContent = totalScore + ' / 600';
+      document.getElementById('flag-counter').textContent = flagsCaptured + '/6';
+      if(flagsCaptured===6){ document.getElementById('flag-counter').className='status-chip chip-green'; }
+    } else {
+      input.classList.remove('correct');
+      input.classList.add('wrong');
+      result.className = 'flag-result show fail';
+      result.textContent = '✗ Incorrect flag. Review the evidence more carefully.';
+      setTimeout(() => input.classList.remove('wrong'), 600);
+    }
+  }
+
+  document.querySelectorAll('.flag-input').forEach(inp => {
+    inp.addEventListener('keydown', e => {
+      if(e.key === 'Enter') {
+        const num = parseInt(inp.id.replace('flag','').replace('-input',''));
+        const answers = {1:'MPCCU{domain_reg_20250227}',2:'MPCCU{CAMBODIA-OPS}',3:'MPCCU{YESB0000001}',4:'MPCCU{android.permission.RECEIVE_SMS}',5:'MPCCU{zh-CN}',6:'MPCCU{CAMBODIA}'};
+        checkFlag(num, answers[num]);
+      }
+    });
+  });
+
+  // ─── Hints ───
+  function showHint(id) {
+    const box = document.getElementById(id);
+    box.classList.toggle('show');
+  }
+
+  // ─── Answer Key ───
+  function toggleAnswerKey() {
+    const body = document.getElementById('ak-body');
+    body.classList.toggle('open');
+    const btn = document.querySelector('.lock-btn');
+    btn.textContent = body.classList.contains('open') ? '🔒 HIDE ANSWERS' : '🔓 REVEAL ANSWERS';
+  }
+</script>
+</body>
+</html>
